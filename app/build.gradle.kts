@@ -24,8 +24,8 @@ android {
         applicationId = "com.tvdesk.poc"
         minSdk = 21
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.4"
+        versionCode = 6
+        versionName = "1.5"
         buildConfigField("String", "SUPABASE_URL", supabaseField("SUPABASE_URL"))
         buildConfigField("String", "SUPABASE_ANON_KEY", supabaseField("SUPABASE_ANON_KEY"))
         buildConfigField("String", "OPENWEATHER_API_KEY", supabaseField("OPENWEATHER_API_KEY"))
