@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TV Desk</string>
+    <string name="eyebrow">TV Desk</string>
+    <string name="heading_today">Today</string>
+    <string name="heading_tomorrow">Tomorrow</string>
+    <string name="mark_done">Mark done</string>
+    <string name="awards">Awards</string>
+    <string name="show_tasks">Tasks</string>
+    <string name="show_awards">Awards</string>
+    <string name="done">Done</string>
+    <string name="done_count">%1$d of %2$d done</string>
+    <string name="btn_duolingo">Duolingo</string>
+    <string name="btn_exercise">Exercise</string>
+    <string name="btn_maths">Maths</string>
+    <string name="btn_time">Time</string>
+    <string name="btn_device">Device</string>
+    <string name="btn_note">Note</string>
+    <string name="btn_view">Theme</string>
+    <string name="task_icon">Task icon</string>
+    <string name="flower">Flower</string>
+    <string name="unlock_remaining">%1$d more tasks to unlock TV time today</string>
+    <string name="unlock_one">1 more task to unlock TV time today</string>
+    <string name="unlock_done">TV time is unlocked</string>
+    <string name="unlock_empty">Add tasks on the web page.</string>
+    <string name="status_board_error">Could not read the board. Paste supabase/schema.sql into the Supabase SQL editor, then reopen the app.</string>
+    <string name="task_done_label">%1$s  ·  Done</string>
+    <string name="marked_done">%1$s marked done.</string>
+    <string name="marked_open">%1$s is open again.</string>
+    <string name="status_ready">Select a task, then press the center button to mark it done.</string>
+    <string name="status_sample">Sample plan saved on this TV. Connect Supabase to edit it from the web page.</string>
+    <string name="status_loading">Loading the board…</string>
+    <string name="status_live">Live from the web page. This TV checks for changes every 15 seconds.</string>
+    <string name="status_offline">Could not reach Supabase. Showing the last update.</string>
+    <string name="status_save_failed">Could not save that change. Check the TV internet connection.</string>
+    <string name="title_time">Time captured</string>
+    <string name="press_count">Button presses: %1$d</string>
+    <string name="note_progress">Note %1$d of %2$d</string>
+</resources>
