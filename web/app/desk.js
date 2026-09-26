@@ -52,6 +52,7 @@ export default function Desk() {
   const [userId, setUserId] = useState("");
   const [userDraft, setUserDraft] = useState("");
   const [awardDraft, setAwardDraft] = useState({ title: "TV time", message: "", minutes: 60, show_when: "all_done" });
+  const [taskDraft, setTaskDraft] = useState(blankTask);
   const [itemDraft, setItemDraft] = useState(blankItem);
 
   const load = useCallback(async () => {
