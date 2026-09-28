@@ -16,12 +16,28 @@ export const CADENCES = [
 
 export const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export const THEMES = [
-  ["cards", "Cards"],
-  ["classic", "Classic"],
-  ["agenda", "Agenda"],
-  ["night", "Night"],
+export const LOOKS = [
+  ["navy", "Navy", "The current dark blue board"],
+  ["paper", "Warm paper", "Cream paper, easier to read in a bright room"],
+  ["daylight", "Daylight", "A light blue daytime board"],
+  ["meadow", "Meadow", "Soft green, lighter and a bit playful"],
+  ["sunset", "Sunset", "Warm peach and pink, like late afternoon"],
 ];
+
+export function lookOf(settings) {
+  const id = settings && settings.meta && settings.meta.look;
+  return LOOKS.some(([value]) => value === id) ? id : "navy";
+}
+
+export function lookLabel(id) {
+  const found = LOOKS.find(([value]) => value === id);
+  return found ? found[1] : "Navy";
+}
+
+export function itemMarked(item, today) {
+  const days = item && item.meta && item.meta.done_days;
+  return Array.isArray(days) && days.includes(today);
+}
 
 export const SHOW_WHEN = [
   ["all_done", "When every task due today is done"],

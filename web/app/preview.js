@@ -1,6 +1,6 @@
 "use client";
 
-import { addDays, countdownDays, earnedAwards, greeting, longDate, nextSaturday, occurs } from "../lib/board";
+import { addDays, countdownDays, earnedAwards, greeting, itemMarked, longDate, lookLabel, lookOf, nextSaturday, occurs } from "../lib/board";
 
 const ICON_PATHS = {
   document: "M7 3h7l5 5v13H7zM14 3v5h5",
@@ -19,28 +19,42 @@ function Icon({ name }) {
     </svg>
   );
 }
-
 function clockParts(now) {
   const time = now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   const match = time.match(/^(.*?)\s*(AM|PM)?$/i);
   return { time: match ? match[1] : time, suffix: match && match[2] ? match[2] : "" };
 }
 
-function ScheduleList({ rows }) {
+function ScheduleList({ rows, today, onToggle }) {
   if (rows.length === 0) return <p className="tv-empty">Nothing on the schedule</p>;
   return (
     <ul className="tv-schedule">
-      {rows.map((row) => (
-        <li key={row.id}>
-          <span className="tv-time">{row.time_label || "--"}</span>
-          <span className="tv-title">{row.title}</span>
-        </li>
-      ))}
+      {rows.map((row) => {
+        const done = today ? itemMarked(row, today) : false;
+        const body = (
+          <>
+            <span className="tv-time">{row.time_label || "--"}</span>
+            <span className="tv-title">{row.title}</span>
+            {done ? <span className="tv-done">Done</span> : null}
+          </>
+        );
+        return (
+          <li key={row.id}>
+            {today ? (
+              <button type="button" className={done ? "tv-line done" : "tv-line"} onClick={() => onToggle(row)}>
+                {body}
+              </button>
+            ) : (
+              <span className="tv-line">{body}</span>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
-export default function TvPreview({ board, userId, theme, today, now }) {
+export default function TvPreview({ board, userId, today, now, onToggleToday }) {
   const users = board.users || [];
   const user = users.find((row) => row.id === userId) || users[0] || null;
   const tomorrow = addDays(today, 1);
@@ -59,10 +73,9 @@ export default function TvPreview({ board, userId, theme, today, now }) {
 
   const settings = board.settings || {};
   const city = (settings.city || "Bothell").toUpperCase();
-  const label = (settings.countdown_label || "SAT").toUpperCase();
+  const look = lookOf(settings);
   const days = countdownDays(settings.countdown_date || nextSaturday(today), today);
   const { time, suffix } = clockParts(now);
-  const withSeconds = now.toLocaleTimeString();
 
   let unlock = "Add tasks on the Tasks page.";
   if (awardMode) unlock = awards[0].message;
@@ -81,141 +94,57 @@ export default function TvPreview({ board, userId, theme, today, now }) {
         state: index === focusIndex ? "focus" : doneOf(task) ? "done" : "idle",
       }));
 
-  const heading = (
-    <div className="tv-head">
-      <div>
-        <p className="tv-kicker">TV DESK · {(user ? user.name : "TV").toUpperCase()}</p>
-        <p className="tv-greeting">{greeting(now)}</p>
-        <p className="tv-date">{longDate(now)}</p>
-      </div>
-      <div className="tv-pills">
-        <span className="tv-pill">Theme<b>{theme}</b></span>
-        <span className="tv-pill">{time}<b>{suffix || "\u00a0"}</b></span>
-        <span className="tv-pill">--&#176;<b>{city}</b></span>
-        <span className="tv-pill">{days}<b>DAYS TO {label}</b></span>
-      </div>
-    </div>
-  );
-
-  const chips = users.length > 0 && (
-    <div className="tv-users">
-      {users.map((row) => (
-        <span key={row.id} className={row.id === (user ? user.id : "") ? "tv-chip on" : "tv-chip"}>{row.name}</span>
-      ))}
-    </div>
-  );
-
-  const columns = (
-    <div className="tv-columns">
-      <div className="tv-panel">
-        <p className="tv-label">Today</p>
-        <ScheduleList rows={todayRows} />
-      </div>
-      <div className="tv-panel">
-        <p className="tv-label">Tomorrow</p>
-        <ScheduleList rows={tomorrowRows} />
-      </div>
-    </div>
-  );
-
-  const counter = (
-    <div className="tv-counter">
-      <p className="tv-label">{awardMode ? "Awards" : "Mark done"}</p>
-      <p className="tv-count">{done} of {due.length} done</p>
-    </div>
-  );
-
-  const tiles = (
-    <div className="tv-cards">
-      {cards.length === 0 ? <p className="tv-empty">No tasks are due today</p> : null}
-      {cards.map((card) => (
-        <div key={card.key} className={`tv-card ${card.state}`}>
-          <Icon name={card.icon} />
-          <p className="tv-card-title">{card.title}</p>
-          <p className="tv-card-detail">{card.detail}</p>
-        </div>
-      ))}
-    </div>
-  );
-
-  const bar = (
-    <div className="tv-progress">
-      <span style={{ width: due.length ? `${(done / due.length) * 100}%` : "0%" }} />
-    </div>
-  );
-
-  const buttons = (
-    <div className="tv-buttons">
-      <span className="tv-chip on">Theme</span>
-      <span className="tv-chip">Time</span>
-      <span className="tv-chip">Device</span>
-      <span className="tv-chip">Note</span>
-    </div>
-  );
-
-  if (theme === "night") {
-    return (
-      <div className="tv-screen night">
-        <p className="tv-kicker">TV DESK · {(user ? user.name : "TV").toUpperCase()}</p>
-        <p className="tv-bigclock">{withSeconds}</p>
-        <p className="tv-date">{longDate(now)}</p>
-        <p className="tv-count">{done} of {due.length} done · {days} days to {label}</p>
-        <p className="tv-unlock">{unlock}</p>
-      </div>
-    );
-  }
-
-  if (theme === "agenda") {
-    return (
-      <div className="tv-screen agenda">
-        {heading}
-        {chips}
-        {columns}
-        {counter}
-        <div className="tv-chiprow">
-          {cards.map((card) => (
-            <span key={card.key} className={`tv-taskchip ${card.state}`}>{card.title}</span>
-          ))}
-        </div>
-        <p className="tv-unlock">{unlock}</p>
-      </div>
-    );
-  }
-
-  if (theme === "classic") {
-    return (
-      <div className="tv-screen classic">
-        <div className="tv-head">
-          <div>
-            <p className="tv-kicker">TV DESK · {(user ? user.name : "TV").toUpperCase()}</p>
-            <p className="tv-bigclock small">{withSeconds}</p>
-            <p className="tv-date">{longDate(now)}</p>
-          </div>
-          <p className="tv-meta">--&#176; {settings.city || "Bothell"} · {days} days to {label}</p>
-        </div>
-        {chips}
-        {columns}
-        {counter}
-        <div className="tv-chiprow">
-          {cards.map((card) => (
-            <span key={card.key} className={`tv-taskchip ${card.state}`}>{card.title}</span>
-          ))}
-        </div>
-        {buttons}
-        <p className="tv-unlock">{unlock}</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="tv-screen cards">
-      {heading}
-      {chips}
-      {columns}
-      {counter}
-      {tiles}
-      {bar}
+    <div className={`tv-screen cards look-${look}`}>
+      <div className="tv-head">
+        <div>
+          <p className="tv-kicker">TV DESK · {(user ? user.name : "TV").toUpperCase()}</p>
+          <p className="tv-greeting">{greeting(now)}</p>
+          <p className="tv-date">{longDate(now)}</p>
+        </div>
+        <div className="tv-pills">
+          <span className="tv-pill">Look<b>{lookLabel(look)}</b></span>
+          <span className="tv-pill">{time}<b>{suffix || "\u00a0"}</b></span>
+          <span className="tv-pill">--&#176;<b>{city}</b></span>
+          <span className="tv-pill wide">{days}<b>Days for Weekend</b></span>
+        </div>
+      </div>
+      {users.length > 0 ? (
+        <div className="tv-users">
+          {users.map((row) => (
+            <span key={row.id} className={row.id === (user ? user.id : "") ? "tv-chip on" : "tv-chip"}>{row.name}</span>
+          ))}
+        </div>
+      ) : null}
+      <div className="tv-columns">
+        <div className="tv-panel">
+          <p className="tv-label">Today</p>
+          <ScheduleList rows={todayRows} today={today} onToggle={onToggleToday} />
+        </div>
+        <div className="tv-panel">
+          <p className="tv-label">Tomorrow</p>
+          <ScheduleList rows={tomorrowRows} />
+        </div>
+      </div>
+      <div className="tv-counter">
+        <p className="tv-label">{awardMode ? "Awards" : "Mark done"}</p>
+        <p className="tv-count">{done} of {due.length} done</p>
+      </div>
+      <div className="tv-cards">
+        {cards.length === 0 ? <p className="tv-empty">No tasks are due today</p> : null}
+        {cards.map((card) => (
+          <div key={card.key} className={`tv-card ${card.state}`}>
+            <Icon name={card.icon} />
+            <p className="tv-card-title">{card.title}</p>
+            <p className="tv-card-detail">{card.detail}</p>
+          </div>
+        ))}
+      </div>
+      <div className="tv-progress">
+        <span style={{ width: due.length ? `${(done / due.length) * 100}%` : "0%" }} />
+      </div>
       <p className="tv-unlock">{unlock}</p>
     </div>
   );
 }
+

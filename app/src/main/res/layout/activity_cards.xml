@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/screen"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_cards"
@@ -64,8 +65,8 @@
 
         <Button
             android:id="@+id/btnView"
-            android:layout_width="92dp"
-            android:layout_height="72dp"
+            android:layout_width="108dp"
+            android:layout_height="64dp"
             android:layout_marginEnd="10dp"
             android:background="@drawable/pill_bg"
             android:defaultFocusHighlightEnabled="false"
@@ -77,7 +78,7 @@
         <TextView
             android:id="@+id/clockView"
             android:layout_width="92dp"
-            android:layout_height="72dp"
+            android:layout_height="64dp"
             android:layout_marginEnd="10dp"
             android:background="@drawable/pill_bg"
             android:gravity="center"
@@ -88,7 +89,7 @@
         <TextView
             android:id="@+id/weatherView"
             android:layout_width="92dp"
-            android:layout_height="72dp"
+            android:layout_height="64dp"
             android:layout_marginEnd="10dp"
             android:background="@drawable/pill_bg"
             android:gravity="center"
@@ -97,12 +98,12 @@
 
         <TextView
             android:id="@+id/countdownView"
-            android:layout_width="108dp"
-            android:layout_height="72dp"
+            android:layout_width="148dp"
+            android:layout_height="64dp"
             android:background="@drawable/pill_bg"
             android:gravity="center"
             android:textColor="@color/text"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 
     <LinearLayout
@@ -113,14 +114,17 @@
         android:orientation="horizontal" />
 
     <LinearLayout
+        android:id="@+id/scheduleRow"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="10dp"
+        android:layout_weight="1.7"
         android:orientation="horizontal">
 
         <LinearLayout
+            android:id="@+id/todayPanel"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_marginEnd="12dp"
             android:layout_weight="1"
             android:background="@drawable/task_idle"
@@ -131,6 +135,7 @@
             android:paddingBottom="8dp">
 
             <TextView
+                android:id="@+id/headingToday"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:letterSpacing="0.12"
@@ -148,8 +153,9 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/tomorrowPanel"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@drawable/task_idle"
             android:orientation="vertical"
@@ -159,6 +165,7 @@
             android:paddingBottom="8dp">
 
             <TextView
+                android:id="@+id/headingTomorrow"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:letterSpacing="0.12"
@@ -222,9 +229,9 @@
     <LinearLayout
         android:id="@+id/taskRow"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_height="112dp"
         android:layout_marginTop="8dp"
-        android:layout_weight="1"
+        android:layout_weight="0"
         android:orientation="horizontal" />
 
     <LinearLayout

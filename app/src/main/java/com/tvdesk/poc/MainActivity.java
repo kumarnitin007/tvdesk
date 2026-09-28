@@ -3,7 +3,9 @@ package com.tvdesk.poc;
 import android.app.Activity;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
+import android.graphics.Paint;
 import android.graphics.PorterDuff;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -30,11 +32,10 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
 
     private static final String PREFS = "tvdesk_tasks";
-    private static final String KEY_THEME = "theme";
+    private static final String KEY_LOOK = "look";
     private static final String KEY_USER = "user";
     private static final long POLL_MS = 15000L;
     private static final long WEATHER_MS = 20L * 60L * 1000L;
-    private static final String[] THEMES = new String[]{"cards", "classic", "agenda", "night"};
 
     private final long openedAt = SystemClock.elapsedRealtime();
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -57,13 +58,13 @@ public class MainActivity extends Activity {
     private DeskStore store;
     private SharedPreferences prefs;
     private Board board = Board.empty();
-    private String theme = "cards";
+    private String look = "navy";
     private String selectedUserId;
     private long userLockedUntil = 0L;
     private boolean forceTasks = false;
     private String weatherText = "";
     private long weatherAt = 0L;
-    private long themeLockedUntil = 0L;
+    private long lookLockedUntil = 0L;
     private boolean sawBoard = false;
     private int clicks = 0;
 
@@ -86,15 +87,24 @@ public class MainActivity extends Activity {
     private TextView sectionLabel;
     private Button btnTasks;
     private Button btnView;
+    private View screen;
+    private View todayPanel;
+    private View tomorrowPanel;
+    private TextView headingToday;
+    private TextView headingTomorrow;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         store = new DeskStore(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_ANON_KEY, BuildConfig.OPENWEATHER_API_KEY);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        theme = prefs.getString(KEY_THEME, "cards");
+        look = Looks.canonical(prefs.getString(KEY_LOOK, "navy"));
         selectedUserId = prefs.getString(KEY_USER, null);
-        showTheme(theme, true);
+        setContentView(R.layout.activity_cards);
+        bind();
+        applyLook();
+        renderBoard();
+        renderClock();
         statusLine.setText(R.string.status_loading);
     }
 
@@ -120,18 +130,6 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    private void showTheme(String next, boolean force) {
-        if (!force && next.equals(theme) && taskRow != null) {
-            return;
-        }
-        theme = canonical(next);
-        prefs.edit().putString(KEY_THEME, theme).apply();
-        setContentView(layoutFor(theme));
-        bind();
-        renderBoard();
-        renderClock();
-    }
-
     private void bind() {
         nameView = find(R.id.nameView);
         greetingView = find(R.id.greetingView);
@@ -152,12 +150,17 @@ public class MainActivity extends Activity {
         sectionLabel = find(R.id.sectionLabel);
         btnTasks = findViewById(R.id.btnTasks);
         btnView = findViewById(R.id.btnView);
+        screen = findViewById(R.id.screen);
+        todayPanel = findViewById(R.id.todayPanel);
+        tomorrowPanel = findViewById(R.id.tomorrowPanel);
+        headingToday = find(R.id.headingToday);
+        headingTomorrow = find(R.id.headingTomorrow);
         if (btnView != null) {
-            btnView.setText(themeLabel(theme));
+            btnView.setText(Looks.of(look).label);
             btnView.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    cycleTheme();
+                    cycleLook();
                 }
             });
             growOnFocus(btnView);
@@ -217,9 +220,11 @@ public class MainActivity extends Activity {
                             if (next.userById(selectedUserId) == null && !next.users.isEmpty()) {
                                 selectedUserId = next.users.get(0).id;
                             }
-                            if (SystemClock.elapsedRealtime() > themeLockedUntil
-                                    && !theme.equals(next.settings.theme)) {
-                                showTheme(next.settings.theme, false);
+                            if (SystemClock.elapsedRealtime() > lookLockedUntil
+                                    && !look.equals(next.settings.look)) {
+                                look = next.settings.look;
+                                prefs.edit().putString(KEY_LOOK, look).apply();
+                                applyLook();
                             }
                             renderBoard();
                             renderClock();
@@ -240,22 +245,27 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void cycleTheme() {
+    private void cycleLook() {
         int index = 0;
-        for (int i = 0; i < THEMES.length; i++) {
-            if (THEMES[i].equals(theme)) {
-                index = (i + 1) % THEMES.length;
+        for (int i = 0; i < Looks.IDS.length; i++) {
+            if (Looks.IDS[i].equals(look)) {
+                index = (i + 1) % Looks.IDS.length;
             }
         }
-        final String next = THEMES[index];
-        themeLockedUntil = SystemClock.elapsedRealtime() + 8000L;
-        showTheme(next, true);
-        statusLine.setText(themeLabel(next) + " view");
+        final String next = Looks.IDS[index];
+        look = next;
+        lookLockedUntil = SystemClock.elapsedRealtime() + 8000L;
+        prefs.edit().putString(KEY_LOOK, look).apply();
+        applyLook();
+        if (btnView != null) {
+            btnView.setText(Looks.of(look).label);
+        }
+        statusLine.setText(Looks.of(next).label + " background");
         io.execute(new Runnable() {
             @Override
             public void run() {
                 try {
-                    store.setTheme(next);
+                    store.setLook(next);
                 } catch (Exception ignored) {
                     handler.post(new Runnable() {
                         @Override
@@ -290,15 +300,20 @@ public class MainActivity extends Activity {
         fillSchedule(tomorrowList, tomorrow, false, user);
         fillTasks(today, user, focusedId, keepCurrentFocus);
         if (btnView != null) {
-            btnView.setText(themeLabel(theme));
+            btnView.setText(Looks.of(look).label);
         }
     }
 
-    private void fillSchedule(LinearLayout list, String day, boolean showDone, Board.User user) {
+    private void fillSchedule(LinearLayout list, String day, boolean canMark, Board.User user) {
+        String focusedId = null;
+        View focused = getCurrentFocus();
+        if (focused != null && focused.getTag() instanceof String) {
+            focusedId = (String) focused.getTag();
+        }
         list.removeAllViews();
-        boolean compact = "cards".equals(theme) || "night".equals(theme);
+        View restore = null;
         for (int i = 0; i < board.items.size(); i++) {
-            Board.Item item = board.items.get(i);
+            final Board.Item item = board.items.get(i);
             if (user != null && item.userId != null && !item.userId.equals(user.id)) {
                 continue;
             }
@@ -311,28 +326,85 @@ public class MainActivity extends Activity {
             TextView status = row.findViewById(R.id.rowStatus);
             time.setText(item.timeLabel);
             title.setText(item.title);
-            if (compact) {
-                time.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-                title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-            }
-            boolean done = showDone && itemDone(item);
-            title.setAlpha(done ? 0.55f : 1f);
+            time.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+            title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+            final boolean done = canMark && Board.itemMarked(item.metaJson, day);
+            title.setPaintFlags(done ? title.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG : title.getPaintFlags() & ~Paint.STRIKE_THRU_TEXT_FLAG);
             status.setVisibility(done ? View.VISIBLE : View.INVISIBLE);
+            Looks palette = Looks.of(look);
+            time.setTextColor(palette.muted);
+            title.setTextColor(palette.text);
+            if (canMark) {
+                row.setTag(item.id);
+                row.setFocusable(true);
+                row.setClickable(true);
+                if (Build.VERSION.SDK_INT >= 26) {
+                    row.setDefaultFocusHighlightEnabled(false);
+                }
+                paintScheduleRow(row, done, false);
+                row.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        toggleItem(item, day);
+                    }
+                });
+                row.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+                    @Override
+                    public void onFocusChange(View v, boolean hasFocus) {
+                        paintScheduleRow(v, Board.itemMarked(item.metaJson, day), hasFocus);
+                    }
+                });
+                if (item.id.equals(focusedId)) {
+                    restore = row;
+                }
+            }
             list.addView(row);
+        }
+        if (restore != null) {
+            restore.requestFocus();
         }
     }
 
-    private boolean itemDone(Board.Item item) {
-        for (int i = 0; i < board.tasks.size(); i++) {
-            Board.Task task = board.tasks.get(i);
-            if (!board.isDone(task)) {
-                continue;
-            }
-            if (task.id.equals(item.taskId) || task.label.equalsIgnoreCase(item.title)) {
-                return true;
-            }
+    private void paintScheduleRow(View row, boolean done, boolean focused) {
+        GradientDrawable background = new GradientDrawable();
+        background.setCornerRadius(dp(8));
+        if (focused) {
+            background.setColor(0x66F5C542);
+        } else if (done) {
+            background.setColor(0x332E8A62);
+        } else {
+            background.setColor(0x00000000);
         }
-        return false;
+        row.setBackground(background);
+    }
+
+    private void toggleItem(final Board.Item item, final String day) {
+        final boolean nowDone = !Board.itemMarked(item.metaJson, day);
+        io.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    store.setItemMarked(item.id, item.metaJson, day, nowDone);
+                    final Board next = store.fetch(day);
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            board = next;
+                            sawBoard = true;
+                            renderBoard();
+                            statusLine.setText(getString(nowDone ? R.string.marked_done : R.string.marked_open, item.title));
+                        }
+                    });
+                } catch (Exception ignored) {
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            statusLine.setText(R.string.status_save_failed);
+                        }
+                    });
+                }
+            }
+        });
     }
 
     private void fillUsers(final Board.User current) {
@@ -443,7 +515,7 @@ public class MainActivity extends Activity {
                 }
             });
         }
-        boolean cards = "cards".equals(theme);
+        boolean cards = true;
         View restore = null;
         View firstOpen = null;
         if (awardMode) {
@@ -579,10 +651,26 @@ public class MainActivity extends Activity {
 
     private void styleCard(View card, boolean focused) {
         TaskRef ref = (TaskRef) card.getTag();
-        int background = focused ? R.drawable.task_focus : (ref.done ? R.drawable.task_done_fill : R.drawable.task_idle);
-        card.setBackgroundResource(background);
-        int titleColor = focused ? getResources().getColor(R.color.ink) : getResources().getColor(R.color.text);
-        int detailColor = focused ? getResources().getColor(R.color.ink) : getResources().getColor(R.color.muted);
+        if (focused) {
+            card.setBackgroundResource(R.drawable.task_focus);
+        } else if (ref.done) {
+            card.setBackgroundResource(R.drawable.task_done_fill);
+        } else {
+            GradientDrawable idle = new GradientDrawable();
+            idle.setColor(Looks.of(look).idle);
+            idle.setCornerRadius(dp(18));
+            card.setBackground(idle);
+        }
+        Looks palette = Looks.of(look);
+        int titleColor = palette.text;
+        int detailColor = palette.muted;
+        if (focused) {
+            titleColor = getResources().getColor(R.color.ink);
+            detailColor = titleColor;
+        } else if (ref.done) {
+            titleColor = getResources().getColor(R.color.text);
+            detailColor = getResources().getColor(R.color.muted);
+        }
         ((TextView) card.findViewById(R.id.cardTitle)).setTextColor(titleColor);
         ((TextView) card.findViewById(R.id.cardDetail)).setTextColor(detailColor);
         ImageView icon = card.findViewById(R.id.cardIcon);
@@ -668,25 +756,18 @@ public class MainActivity extends Activity {
             greetingView.setText(greeting());
         }
         if (clockView != null) {
-            if ("cards".equals(theme) && !hour24 && time.contains(" ")) {
+            if (!hour24 && time.contains(" ")) {
                 clockView.setText(time.replace(" ", "\n"));
-            } else if ("cards".equals(theme)) {
-                clockView.setText(time + "\n");
             } else {
-                clockView.setText("cards".equals(theme) ? time : new SimpleDateFormat(hour24 ? "HH:mm:ss" : "h:mm:ss a", Locale.getDefault()).format(now));
+                clockView.setText(time);
             }
         }
-        String countdown = countdownText();
         if (weatherView != null) {
             String city = board.settings.city.toUpperCase(Locale.US);
-            if ("cards".equals(theme)) {
-                weatherView.setText((weatherText.length() == 0 ? "--" : weatherText) + "\n" + city);
-            } else {
-                weatherView.setText((weatherText.length() == 0 ? "" : weatherText + "  ") + board.settings.city);
-            }
+            weatherView.setText((weatherText.length() == 0 ? "--" : weatherText) + "\n" + city);
         }
         if (countdownView != null) {
-            countdownView.setText(countdown);
+            countdownView.setText(countdownText());
         }
         if (metaView != null) {
             long elapsed = (SystemClock.elapsedRealtime() - openedAt) / 1000L;
@@ -695,7 +776,7 @@ public class MainActivity extends Activity {
             if (weatherText.length() > 0) {
                 extra = "   ·   " + weatherText + " " + board.settings.city;
             }
-            metaView.setText("Open " + openFor + extra + "   ·   " + countdown.replace("\n", " "));
+            metaView.setText("Open " + openFor + extra + "   ·   " + countdownText().replace("\n", " "));
         }
     }
 
@@ -712,11 +793,7 @@ public class MainActivity extends Activity {
         if (days < 0) {
             days = 0;
         }
-        String label = board.settings.countdownLabel.toUpperCase(Locale.US);
-        if ("cards".equals(theme)) {
-            return days + "\nDAYS TO " + label;
-        }
-        return days + " days to " + label;
+        return days + "\nDays for Weekend";
     }
 
     private String greeting() {
@@ -777,7 +854,7 @@ public class MainActivity extends Activity {
 
     private void showNote() {
         clicks++;
-        statusLine.setText("Themes share one board: Cards, Classic, Agenda, and Night.");
+        statusLine.setText("Backgrounds: Navy, Paper, Daylight, Meadow, and Sunset.");
     }
 
     private void wireInfo(int id, final Runnable action) {
@@ -815,39 +892,68 @@ public class MainActivity extends Activity {
         return statusLine != null && getString(resId).contentEquals(statusLine.getText());
     }
 
-    private int layoutFor(String name) {
-        if ("classic".equals(name)) {
-            return R.layout.activity_main;
+    private void applyLook() {
+        Looks palette = Looks.of(look);
+        if (screen != null) {
+            GradientDrawable background = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{palette.bgTop, palette.bgBottom});
+            screen.setBackground(background);
         }
-        if ("agenda".equals(name)) {
-            return R.layout.activity_agenda;
+        paintPanel(todayPanel, palette.panel);
+        paintPanel(tomorrowPanel, palette.panel);
+        paintPill(clockView, palette);
+        paintPill(weatherView, palette);
+        paintPill(countdownView, palette);
+        if (btnView != null) {
+            paintPill(btnView, palette);
+            btnView.setText(palette.label);
         }
-        if ("night".equals(name)) {
-            return R.layout.activity_night;
+        if (nameView != null) {
+            nameView.setTextColor(palette.muted);
         }
-        return R.layout.activity_cards;
+        if (greetingView != null) {
+            greetingView.setTextColor(palette.text);
+        }
+        if (dateView != null) {
+            dateView.setTextColor(palette.muted);
+        }
+        if (headingToday != null) {
+            headingToday.setTextColor(palette.muted);
+        }
+        if (headingTomorrow != null) {
+            headingTomorrow.setTextColor(palette.muted);
+        }
+        if (sectionLabel != null) {
+            sectionLabel.setTextColor(palette.muted);
+        }
+        if (unlockLine != null) {
+            unlockLine.setTextColor(palette.muted);
+        }
+        if (statusLine != null) {
+            statusLine.setTextColor(palette.muted);
+        }
     }
 
-    private String canonical(String name) {
-        for (int i = 0; i < THEMES.length; i++) {
-            if (THEMES[i].equals(name)) {
-                return name;
-            }
+    private void paintPanel(View panel, int color) {
+        if (panel == null) {
+            return;
         }
-        return "cards";
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(color);
+        background.setCornerRadius(dp(18));
+        panel.setBackground(background);
     }
 
-    private String themeLabel(String name) {
-        if ("classic".equals(name)) {
-            return "Classic";
+    private void paintPill(View pill, Looks palette) {
+        if (pill == null) {
+            return;
         }
-        if ("agenda".equals(name)) {
-            return "Agenda";
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(palette.pill);
+        background.setCornerRadius(dp(16));
+        pill.setBackground(background);
+        if (pill instanceof TextView) {
+            ((TextView) pill).setTextColor(palette.text);
         }
-        if ("night".equals(name)) {
-            return "Night";
-        }
-        return "Cards";
     }
 
     private String todayKey() {

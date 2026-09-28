@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabase } from "../lib/supabase";
 import TvPreview from "./preview";
-import { CADENCES, DAYS, ICONS, SHOW_WHEN, THEMES, cadenceText, dayKey, occurs } from "../lib/board";
+import { CADENCES, DAYS, ICONS, LOOKS, SHOW_WHEN, cadenceText, dayKey, lookOf, occurs } from "../lib/board";
 
 const VIEWS = [
   ["dashboard", "Dashboard"],
@@ -124,7 +124,6 @@ export default function Desk() {
   const [draft, setDraft] = useState(null);
   const [counts, setCounts] = useState({});
   const [userId, setUserId] = useState("");
-  const [previewTheme, setPreviewTheme] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -153,7 +152,7 @@ export default function Desk() {
       return;
     }
     const next = {
-      settings: settingsRes.data || { id: 1, theme: "cards", city: "Bothell", countdown_label: "SAT", countdown_date: null, active_user_id: null },
+      settings: settingsRes.data || { id: 1, theme: "cards", city: "Bothell", countdown_label: "Weekend", countdown_date: null, active_user_id: null, meta: {} },
       users: userRes.data || [],
       tasks: taskRes.data || [],
       items: itemRes.data || [],
@@ -193,7 +192,7 @@ export default function Desk() {
 
   const dirty = Boolean(server && draft) && JSON.stringify(server) !== JSON.stringify(draft);
   const today = now ? dayKey(now) : "";
-  const theme = previewTheme || (draft ? draft.settings.theme : "cards");
+  const look = draft ? lookOf(draft.settings) : "navy";
 
   function patch(part) {
     setDraft((current) => ({ ...current, ...part }));
@@ -272,17 +271,16 @@ export default function Desk() {
       await pushRows("tvdesk_schedule_items", draft.items, server.items, itemPayload, idMap);
       await pushRows("tvdesk_awards", draft.awards, server.awards, awardPayload, idMap);
       const settingsBody = {
-        theme: draft.settings.theme,
+        theme: "cards",
         city: (draft.settings.city || "Bothell").trim() || "Bothell",
-        countdown_label: (draft.settings.countdown_label || "SAT").trim() || "SAT",
         countdown_date: draft.settings.countdown_date || null,
         active_user_id: mapped(idMap, draft.settings.active_user_id),
+        meta: { ...(draft.settings.meta || {}), look: lookOf(draft.settings) },
       };
       const { error: settingsError } = await supabase.from("tvdesk_settings").upsert({ id: 1, ...settingsBody });
       if (settingsError) throw settingsError;
       if (idMap[userId]) setUserId(idMap[userId]);
       await load();
-      setPreviewTheme("");
       setNotice("Saved. The TV shows this within 15 seconds — no new APK needed.");
     } catch (thrown) {
       setError(`${thrown.message || thrown} — nothing after that point was saved.`);
@@ -290,6 +288,22 @@ export default function Desk() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function toggleToday(item) {
+    if (!item || isNew(item.id) || !today) return;
+    const meta = { ...(item.meta || {}) };
+    const days = Array.isArray(meta.done_days) ? meta.done_days.filter(Boolean) : [];
+    const nextDays = days.includes(today) ? days.filter((day) => day !== today) : days.concat(today);
+    const nextMeta = { ...meta, done_days: nextDays };
+    const { error: writeError } = await supabase.from("tvdesk_schedule_items").update({ meta: nextMeta }).eq("id", item.id);
+    if (writeError) {
+      setError(writeError.message);
+      return;
+    }
+    const stamp = (rows) => rows.map((row) => (row.id === item.id ? { ...row, meta: nextMeta } : row));
+    setServer((current) => (current ? { ...current, items: stamp(current.items) } : current));
+    setDraft((current) => (current ? { ...current, items: stamp(current.items) } : current));
   }
 
   if (!draft) {
@@ -371,27 +385,21 @@ export default function Desk() {
             television picks it up on its next check.
           </p>
           <div className="themepick">
-            <span className="field-label">Look at this theme</span>
+            <span className="field-label">Background</span>
             <div className="inline">
-              {THEMES.map(([value, label]) => (
+              {LOOKS.map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
-                  className={value === theme ? "chip on" : "chip"}
-                  onClick={() => setPreviewTheme(value)}
+                  className={value === look ? "chip on" : "chip"}
+                  onClick={() => patchSettings({ theme: "cards", meta: { ...(draft.settings.meta || {}), look: value } })}
                 >
                   {label}
                 </button>
               ))}
-              {previewTheme && previewTheme !== draft.settings.theme ? (
-                <button type="button" className="ghost" onClick={() => patchSettings({ theme: previewTheme })}>
-                  Make {previewTheme} the TV theme
-                </button>
-              ) : null}
             </div>
             <p className="field-hint">
-              Previewing a theme here changes nothing. The TV theme is {draft.settings.theme}; the remote Theme button
-              also cycles it.
+              Navy, Warm paper, Daylight, Meadow, or Sunset. The preview changes now. Save to send it to the TV. The look button on the remote cycles the same five.
             </p>
           </div>
           <div className="tv-frame">
@@ -399,15 +407,14 @@ export default function Desk() {
               <TvPreview
                 board={{ ...draft, doneCounts: counts }}
                 userId={userId}
-                theme={theme}
                 today={today}
                 now={now}
+                onToggleToday={toggleToday}
               />
             ) : null}
           </div>
           <p className="sub">
-            Temperature is blank here because only the TV holds the weather key. Marking a task done happens on the TV
-            with the remote.
+            Click a line in Today to mark it done. That saves immediately, like the remote. Task cards stay smaller so Today and Tomorrow have more room. Temperature is blank here because only the TV holds the weather key.
           </p>
         </section>
       ) : null}
@@ -632,18 +639,23 @@ export default function Desk() {
             <Field label="Weather city" hint="Used for the temperature pill on the TV, for example Bothell.">
               <input type="text" value={draft.settings.city || ""} onChange={(event) => patchSettings({ city: event.target.value })} />
             </Field>
-            <Field label="Countdown name" hint="Printed as DAYS TO … on the TV, for example SAT.">
-              <input type="text" value={draft.settings.countdown_label || ""} onChange={(event) => patchSettings({ countdown_label: event.target.value })} />
-            </Field>
-            <Field label="Countdown date" hint="Leave blank and the TV counts to the coming Saturday.">
+            <Field label="Countdown date" hint="Leave blank and the TV counts to the coming Saturday. The pill always reads Days for Weekend.">
               <input type="date" value={draft.settings.countdown_date || ""} onChange={(event) => patchSettings({ countdown_date: event.target.value || null })} />
             </Field>
-            <Field label="TV theme" hint="The look the TV opens with. The remote Theme button can still cycle it.">
-              <select value={draft.settings.theme} onChange={(event) => patchSettings({ theme: event.target.value })}>
-                {THEMES.map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+            <Field label="Background" hint="Navy is the dark board. Warm paper, Daylight, Meadow, and Sunset are lighter.">
+              <div className="inline">
+                {LOOKS.map(([value, label, hint]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={value === look ? "chip on" : "chip"}
+                    onClick={() => patchSettings({ theme: "cards", meta: { ...(draft.settings.meta || {}), look: value } })}
+                    title={hint}
+                  >
+                    {label}
+                  </button>
                 ))}
-              </select>
+              </div>
             </Field>
             <Field label="Person the TV starts on" hint="The remote can switch to anyone else afterwards.">
               <select value={draft.settings.active_user_id || ""} onChange={(event) => patchSettings({ active_user_id: event.target.value || null })}>

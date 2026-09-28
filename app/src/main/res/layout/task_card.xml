@@ -6,12 +6,12 @@
     android:layout_weight="1"
     android:focusable="true"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="10dp">
 
     <ImageView
         android:id="@+id/cardIcon"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
         android:contentDescription="@string/task_icon" />
 
     <View
@@ -24,7 +24,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textColor="@color/text"
-        android:textSize="20sp"
+        android:textSize="16sp"
         android:textStyle="bold" />
 
     <TextView
@@ -33,6 +33,6 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
         android:textColor="@color/muted"
-        android:textSize="14sp" />
+        android:textSize="12sp" />
 
 </LinearLayout>

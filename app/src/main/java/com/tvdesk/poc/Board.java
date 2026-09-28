@@ -52,9 +52,10 @@ public final class Board {
         public final int everyNDays;
         public final String anchorDate;
         public final String onDate;
+        public final String metaJson;
 
         public Item(String id, String userId, String title, String timeLabel, int sortOrder, String taskId, String cadence,
-                    int[] weekdays, int everyNDays, String anchorDate, String onDate) {
+                    int[] weekdays, int everyNDays, String anchorDate, String onDate, String metaJson) {
             this.id = id;
             this.userId = userId;
             this.title = title;
@@ -66,6 +67,7 @@ public final class Board {
             this.everyNDays = everyNDays;
             this.anchorDate = anchorDate;
             this.onDate = onDate;
+            this.metaJson = metaJson == null || metaJson.length() == 0 ? "{}" : metaJson;
         }
     }
 
@@ -112,13 +114,15 @@ public final class Board {
         public final String city;
         public final String countdownLabel;
         public final String countdownDate;
+        public final String look;
 
-        public Settings(String activeUserId, String theme, String city, String countdownLabel, String countdownDate) {
+        public Settings(String activeUserId, String theme, String city, String countdownLabel, String countdownDate, String look) {
             this.activeUserId = activeUserId;
-            this.theme = theme == null || theme.length() == 0 ? "cards" : theme;
+            this.theme = "cards";
             this.city = city == null || city.length() == 0 ? "Bothell" : city;
-            this.countdownLabel = countdownLabel == null || countdownLabel.length() == 0 ? "SAT" : countdownLabel;
+            this.countdownLabel = countdownLabel == null || countdownLabel.length() == 0 ? "Weekend" : countdownLabel;
             this.countdownDate = countdownDate;
+            this.look = Looks.canonical(look);
         }
     }
 
@@ -140,7 +144,7 @@ public final class Board {
     }
 
     public static Board empty() {
-        return new Board(new Settings(null, "cards", null, null, null),
+        return new Board(new Settings(null, "cards", null, null, null, "navy"),
                 new ArrayList<User>(), new ArrayList<Task>(), new ArrayList<Item>(),
                 new ArrayList<Award>(), new HashMap<String, Integer>());
     }
@@ -181,6 +185,58 @@ public final class Board {
 
     public boolean itemDue(Item item, String day) {
         return occurs(item.cadence, item.weekdays, item.everyNDays, item.anchorDate, item.onDate, day);
+    }
+
+    public static boolean itemMarked(String metaJson, String day) {
+        return doneDays(metaJson).contains(day);
+    }
+
+    public static String markItem(String metaJson, String day, boolean mark) {
+        org.json.JSONObject meta;
+        try {
+            meta = new org.json.JSONObject(metaJson == null || metaJson.length() == 0 ? "{}" : metaJson);
+        } catch (org.json.JSONException error) {
+            meta = new org.json.JSONObject();
+        }
+        org.json.JSONArray next = new org.json.JSONArray();
+        org.json.JSONArray days = meta.optJSONArray("done_days");
+        if (days != null) {
+            for (int i = 0; i < days.length(); i++) {
+                String value = days.optString(i, "");
+                if (value.length() > 0 && !value.equals(day)) {
+                    next.put(value);
+                }
+            }
+        }
+        if (mark) {
+            next.put(day);
+        }
+        try {
+            meta.put("done_days", next);
+        } catch (org.json.JSONException ignored) {
+            return metaJson == null ? "{}" : metaJson;
+        }
+        return meta.toString();
+    }
+
+    private static java.util.HashSet<String> doneDays(String metaJson) {
+        java.util.HashSet<String> found = new java.util.HashSet<String>();
+        try {
+            org.json.JSONObject meta = new org.json.JSONObject(metaJson == null || metaJson.length() == 0 ? "{}" : metaJson);
+            org.json.JSONArray days = meta.optJSONArray("done_days");
+            if (days == null) {
+                return found;
+            }
+            for (int i = 0; i < days.length(); i++) {
+                String value = days.optString(i, "");
+                if (value.length() > 0) {
+                    found.add(value);
+                }
+            }
+        } catch (org.json.JSONException ignored) {
+            return found;
+        }
+        return found;
     }
 
     public int countFor(String taskId) {

@@ -47,7 +47,7 @@ public final class DeskStore {
         JSONArray awardRows = getArray("/rest/v1/tvdesk_awards?active=eq.true&select=*&order=sort_order.asc");
 
         Board.Settings settings = settingsRows.length() == 0
-                ? new Board.Settings(null, "cards", null, null, null)
+                ? new Board.Settings(null, "cards", null, null, null, "navy")
                 : settingsOf(settingsRows.getJSONObject(0));
 
         List<Board.User> users = new ArrayList<Board.User>();
@@ -97,10 +97,24 @@ public final class DeskStore {
         send("POST", "/rest/v1/tvdesk_task_logs?on_conflict=task_id,day", body.toString(), "resolution=merge-duplicates,return=minimal");
     }
 
-    public void setTheme(String theme) throws Exception {
+    public void setLook(String look) throws Exception {
+        JSONObject current = new JSONObject();
+        JSONArray rows = getArray("/rest/v1/tvdesk_settings?id=eq.1&select=meta");
+        if (rows.length() > 0) {
+            current = metaObject(rows.getJSONObject(0));
+        }
+        current.put("look", Looks.canonical(look));
         JSONObject body = new JSONObject();
-        body.put("theme", theme);
+        body.put("meta", current);
+        body.put("theme", "cards");
         send("PATCH", "/rest/v1/tvdesk_settings?id=eq.1", body.toString(), "return=minimal");
+    }
+
+    public void setItemMarked(String itemId, String metaJson, String day, boolean mark) throws Exception {
+        JSONObject meta = new JSONObject(Board.markItem(metaJson, day, mark));
+        JSONObject body = new JSONObject();
+        body.put("meta", meta);
+        send("PATCH", "/rest/v1/tvdesk_schedule_items?id=eq." + itemId, body.toString(), "return=minimal");
     }
 
     public void setActiveUser(String userId) throws Exception {
@@ -132,12 +146,14 @@ public final class DeskStore {
     }
 
     private Board.Settings settingsOf(JSONObject row) {
+        JSONObject meta = metaObject(row);
         return new Board.Settings(
                 textOrNull(row, "active_user_id"),
-                row.optString("theme", "cards"),
+                "cards",
                 row.optString("city", ""),
-                row.optString("countdown_label", "SAT"),
-                textOrNull(row, "countdown_date"));
+                row.optString("countdown_label", ""),
+                textOrNull(row, "countdown_date"),
+                meta.optString("look", "navy"));
     }
 
     private Board.Task taskOf(JSONObject row) throws Exception {
@@ -168,7 +184,8 @@ public final class DeskStore {
                 ints(row, "weekdays"),
                 row.isNull("every_n_days") ? 0 : row.optInt("every_n_days", 0),
                 textOrNull(row, "anchor_date"),
-                textOrNull(row, "on_date"));
+                textOrNull(row, "on_date"),
+                metaText(row));
     }
 
     private Board.Award awardOf(JSONObject row) throws Exception {
@@ -235,6 +252,28 @@ public final class DeskStore {
         }
         reader.close();
         return text.toString();
+    }
+
+    private static JSONObject metaObject(JSONObject row) {
+        if (!row.has("meta") || row.isNull("meta")) {
+            return new JSONObject();
+        }
+        Object raw = row.opt("meta");
+        if (raw instanceof JSONObject) {
+            return (JSONObject) raw;
+        }
+        if (raw instanceof String && ((String) raw).length() > 0) {
+            try {
+                return new JSONObject((String) raw);
+            } catch (Exception ignored) {
+                return new JSONObject();
+            }
+        }
+        return new JSONObject();
+    }
+
+    private static String metaText(JSONObject row) {
+        return metaObject(row).toString();
     }
 
     private static String textOrNull(JSONObject row, String name) {
