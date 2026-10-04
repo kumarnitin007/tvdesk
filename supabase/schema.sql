@@ -3,14 +3,11 @@
 -- Paste the whole file into the Supabase SQL editor and run it once.
 
 drop view if exists public.tvdesk_posts_active;
-drop trigger if exists tvdesk_task_star_trigger on public.tvdesk_task_logs;
-drop trigger if exists tvdesk_prepare_post_trigger on public.tvdesk_posts;
-drop trigger if exists tvdesk_post_bonus_trigger on public.tvdesk_posts;
 drop function if exists public.tvdesk_redeem_reward(uuid);
-drop function if exists public.tvdesk_apply_post_bonus();
-drop function if exists public.tvdesk_prepare_post();
-drop function if exists public.tvdesk_sync_task_star();
-drop function if exists public.tvdesk_refresh_user_stats(uuid);
+drop function if exists public.tvdesk_apply_post_bonus() cascade;
+drop function if exists public.tvdesk_prepare_post() cascade;
+drop function if exists public.tvdesk_sync_task_star() cascade;
+drop function if exists public.tvdesk_refresh_user_stats(uuid) cascade;
 
 drop table if exists public.tvdesk_reward_redemptions cascade;
 drop table if exists public.tvdesk_star_ledger cascade;
@@ -329,10 +326,10 @@ insert into public.tvdesk_tasks (id, user_id, label, icon, sort_order, cadence) 
   ('d2000000-0000-4000-8000-000000000004', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'Chores', 'star', 4, 'daily');
 
 insert into public.tvdesk_task_logs (task_id, day, count)
-select 'd1000000-0000-4000-8000-000000000001', current_date - offset_day, 1
+select 'd1000000-0000-4000-8000-000000000001'::uuid, current_date - offset_day, 1
 from generate_series(0, 5) as offset_day
 union all
-select 'd1000000-0000-4000-8000-000000000002', current_date, 1;
+select 'd1000000-0000-4000-8000-000000000002'::uuid, current_date, 1;
 
 insert into public.tvdesk_star_ledger (user_id, stars, reason, note)
 values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 35, 'manual', 'Sample progress toward movie night');
