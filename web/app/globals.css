@@ -399,3 +399,122 @@ button.tv-line.done .tv-title { text-decoration: line-through; opacity: 0.7; }
   .grid { grid-template-columns: 1fr; }
   .rowend { padding-top: 0; }
 }
+
+body:has(.family-page) {
+  padding: 0;
+  background: #f4ead8;
+  color: #3a2e22;
+}
+.family-page {
+  min-height: 100vh;
+  padding: 28px 22px 48px;
+  background: #f4ead8;
+  color: #3a2e22;
+  color-scheme: light;
+}
+.family-page h2 { margin: 0; font-size: 22px; }
+.family-header, .family-users, .header-actions, .segment-row, .day-row, .badge-row, .stepper, .family-page .manage-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.family-header { justify-content: space-between; align-items: flex-start; }
+.family-eyebrow { margin: 0; letter-spacing: 0.16em; font-size: 12px; color: #8a7260; }
+.family-page h1 { margin: 2px 0 4px; font-size: 40px; }
+.family-page p { margin: 0; color: #8a7260; }
+.outline-button, .primary-button, .danger-button, .person-pill, .segment, .day-chip, .badge-choice, .round-button, .stepper button {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.outline-button, .person-pill, .segment, .day-chip, .badge-choice, .round-button {
+  background: #fffaf3;
+  color: #3a2e22;
+  border-radius: 999px;
+}
+.outline-button, .person-pill, .segment { padding: 10px 16px; }
+.person-pill.selected, .segment.selected, .day-chip.selected, .badge-choice.selected { background: #3a2e22; color: #fffaf3; }
+.person-pill.add, .round-button { width: 42px; height: 42px; padding: 0; }
+.family-users { margin: 22px 0; flex-wrap: wrap; }
+.task-groups { display: grid; gap: 18px; }
+.group-label { margin: 0 0 8px; color: #8a7260; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; }
+.family-task-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 16px;
+  background: #fffaf3;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.task-dot { width: 12px; height: 12px; border-radius: 99px; background: #e2b657; }
+.dot-1 { background: #7dbe8a; }
+.dot-2 { background: #7aa2d6; }
+.dot-3 { background: #e29b73; }
+.task-name { flex: 1; font-weight: 650; }
+.task-name.completed { text-decoration: line-through; color: #8a7260; }
+.task-cadence { color: #8a7260; font-size: 13px; }
+.add-task-button, .primary-button { background: #3a2e22; color: #fffaf3; border-radius: 14px; padding: 14px 18px; }
+.add-task-button { width: 100%; margin-top: 18px; }
+.danger-button { background: transparent; color: #9a3b32; padding: 10px 0; }
+.family-error { color: #9a3b32; margin-top: 12px; }
+.family-notice, .migration-banner { margin-top: 12px; }
+.empty-family, .active-posts { margin-top: 16px; }
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(58, 46, 34, 0.35);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 20;
+}
+.sheet {
+  width: min(560px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  background: #fffaf3;
+  border-radius: 24px 24px 0 0;
+  padding: 18px 18px 28px;
+}
+.sheet.wide { width: min(860px, 100%); }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; }
+.sheet-body { display: grid; gap: 14px; margin-top: 12px; }
+.family-field { display: grid; gap: 6px; }
+.family-field span, .sheet small { color: #8a7260; font-size: 13px; }
+.family-field input, .family-field textarea {
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  background: #f4ead8;
+  color: #3a2e22;
+  padding: 12px;
+  font: inherit;
+}
+.day-chip { width: 42px; height: 42px; padding: 0; display: grid; place-items: center; }
+.badge-choice { display: grid; justify-items: center; min-width: 72px; padding: 10px; border-radius: 14px; }
+.stepper b { min-width: 24px; text-align: center; }
+.post-preview, .manage-person {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 16px;
+  background: #f4ead8;
+}
+.management-grid { display: grid; gap: 22px; }
+.avatar-small {
+  width: 36px; height: 36px; border-radius: 99px; display: grid; place-items: center;
+  background: #e2b657; color: #3a2e22; font-weight: 700;
+}
+.two-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (min-width: 800px) {
+  .sheet-backdrop { align-items: center; }
+  .sheet { border-radius: 24px; }
+  .management-grid { grid-template-columns: 1fr 1fr; }
+}

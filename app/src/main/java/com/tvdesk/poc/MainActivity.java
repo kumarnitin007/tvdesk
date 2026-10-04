@@ -16,6 +16,7 @@ import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -92,6 +93,11 @@ public class MainActivity extends Activity {
     private View tomorrowPanel;
     private TextView headingToday;
     private TextView headingTomorrow;
+    private boolean familyMode = true;
+    private String layoutMode = "";
+    private FrameLayout familyRoot;
+    private boolean profileChosen;
+    private String familyScreen = "profiles";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -100,12 +106,140 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         look = Looks.canonical(prefs.getString(KEY_LOOK, "navy"));
         selectedUserId = prefs.getString(KEY_USER, null);
+        showExperience(true);
+        renderCurrent();
+        renderClock();
+        if (statusLine != null) {
+            statusLine.setText(R.string.status_loading);
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (familyMode && "done".equals(familyScreen)) {
+            dismissCelebration();
+            return;
+        }
+        if (familyMode && profileChosen) {
+            profileChosen = false;
+            familyScreen = "profiles";
+            renderFamily();
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    private void showExperience(boolean family) {
+        String mode = family ? "family" : "cards";
+        if (mode.equals(layoutMode)) {
+            return;
+        }
+        layoutMode = mode;
+        familyMode = family;
+        if (family) {
+            setContentView(R.layout.activity_family);
+            familyRoot = findViewById(R.id.familyRoot);
+            taskRow = null;
+            statusLine = null;
+            dateView = null;
+            return;
+        }
+        familyRoot = null;
         setContentView(R.layout.activity_cards);
         bind();
         applyLook();
+    }
+
+    private void renderCurrent() {
+        if (familyMode) {
+            renderFamily();
+            return;
+        }
         renderBoard();
-        renderClock();
-        statusLine.setText(R.string.status_loading);
+    }
+
+    private void renderFamily() {
+        if (familyRoot == null) {
+            return;
+        }
+        final String today = todayKey();
+        Board.User user = board.userById(selectedUserId);
+        if (user == null && !board.users.isEmpty()) {
+            user = board.users.get(0);
+            selectedUserId = user.id;
+        }
+        final List<Board.Task> due = user == null ? new ArrayList<Board.Task>() : board.dueFor(user.id, today);
+        int done = board.completed(due);
+        boolean allDone = !due.isEmpty() && done == due.size();
+        String token = user == null ? "" : user.id + ":" + today;
+        boolean hidden = token.equals(prefs.getString("celebrate", ""));
+        if (!allDone && hidden) {
+            prefs.edit().remove("celebrate").apply();
+            hidden = false;
+        }
+        String screen = "profiles";
+        if (profileChosen && user != null) {
+            screen = allDone && !hidden ? "done" : "board";
+        }
+        familyScreen = screen;
+        final Board.User person = user;
+        FamilyScreen.paint(this, familyRoot, board, person, due, done, screen, today, new FamilyScreen.Actions() {
+            @Override
+            public void pick(String userId) {
+                chooseFamily(userId);
+            }
+
+            @Override
+            public void toggle(Board.Task task) {
+                MainActivity.this.toggle(task);
+            }
+
+            @Override
+            public void watch() {
+                dismissCelebration();
+            }
+        });
+    }
+
+    private void chooseFamily(final String userId) {
+        selectedUserId = userId;
+        profileChosen = true;
+        familyScreen = "board";
+        forceTasks = false;
+        userLockedUntil = SystemClock.elapsedRealtime() + 8000L;
+        prefs.edit().putString(KEY_USER, userId).apply();
+        if (familyRoot != null) {
+            familyRoot.setTag(null);
+        }
+        renderFamily();
+        io.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    store.setActiveUser(userId);
+                } catch (Exception ignored) {
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (statusLine != null) {
+                                statusLine.setText(R.string.status_save_failed);
+                            }
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    private void dismissCelebration() {
+        if (selectedUserId != null) {
+            prefs.edit().putString("celebrate", selectedUserId + ":" + todayKey()).apply();
+        }
+        familyScreen = "board";
+        if (familyRoot != null) {
+            familyRoot.setTag(null);
+        }
+        renderFamily();
     }
 
     @Override
@@ -224,11 +358,17 @@ public class MainActivity extends Activity {
                                     && !look.equals(next.settings.look)) {
                                 look = next.settings.look;
                                 prefs.edit().putString(KEY_LOOK, look).apply();
-                                applyLook();
+                                if (!familyMode) {
+                                    applyLook();
+                                }
                             }
-                            renderBoard();
+                            boolean family = !"cards".equals(next.settings.experience);
+                            if (family != familyMode) {
+                                showExperience(family);
+                            }
+                            renderCurrent();
                             renderClock();
-                            if (announce || statusIs(R.string.status_loading) || statusIs(R.string.status_offline) || statusIs(R.string.status_board_error)) {
+                            if (statusLine != null && (announce || statusIs(R.string.status_loading) || statusIs(R.string.status_offline) || statusIs(R.string.status_board_error))) {
                                 statusLine.setText(R.string.status_live);
                             }
                         }
@@ -237,7 +377,9 @@ public class MainActivity extends Activity {
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            statusLine.setText(sawBoard ? R.string.status_offline : R.string.status_board_error);
+                            if (statusLine != null) {
+                                statusLine.setText(sawBoard ? R.string.status_offline : R.string.status_board_error);
+                            }
                         }
                     });
                 }
@@ -727,15 +869,19 @@ public class MainActivity extends Activity {
                         public void run() {
                             board = next;
                             sawBoard = true;
-                            renderBoard();
-                            statusLine.setText(getString(nowDone ? R.string.marked_done : R.string.marked_open, task.label));
+                            renderCurrent();
+                            if (statusLine != null) {
+                                statusLine.setText(getString(nowDone ? R.string.marked_done : R.string.marked_open, task.label));
+                            }
                         }
                     });
                 } catch (Exception error) {
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            statusLine.setText(R.string.status_save_failed);
+                            if (statusLine != null) {
+                                statusLine.setText(R.string.status_save_failed);
+                            }
                         }
                     });
                 }
@@ -744,6 +890,13 @@ public class MainActivity extends Activity {
     }
 
     private void renderClock() {
+        if (familyRoot != null) {
+            TextView familyClock = familyRoot.findViewWithTag("family-clock");
+            if (familyClock != null) {
+                boolean hour24 = DateFormat.is24HourFormat(this);
+                familyClock.setText(new SimpleDateFormat(hour24 ? "HH:mm" : "h:mm a", Locale.getDefault()).format(new Date()));
+            }
+        }
         if (dateView == null) {
             return;
         }

@@ -40,11 +40,19 @@ public final class DeskStore {
 
     public Board fetch(String today) throws Exception {
         JSONArray settingsRows = getArray("/rest/v1/tvdesk_settings?id=eq.1&select=*");
-        JSONArray userRows = getArray("/rest/v1/tvdesk_users?active=eq.true&select=id,name,sort_order&order=sort_order.asc");
+        JSONArray userRows = optionalArray("/rest/v1/tvdesk_users?active=eq.true&select=id,name,sort_order,reward_title,reward_target,stars_toward_reward,streak_current,streak_best&order=sort_order.asc");
+        if (userRows.length() == 0) {
+            JSONArray basicUsers = getArray("/rest/v1/tvdesk_users?active=eq.true&select=id,name,sort_order&order=sort_order.asc");
+            if (basicUsers.length() > 0) {
+                userRows = basicUsers;
+            }
+        }
         JSONArray taskRows = getArray("/rest/v1/tvdesk_tasks?active=eq.true&select=*&order=sort_order.asc");
         JSONArray itemRows = getArray("/rest/v1/tvdesk_schedule_items?active=eq.true&select=*&order=sort_order.asc");
         JSONArray logRows = getArray("/rest/v1/tvdesk_task_logs?day=eq." + today + "&select=task_id,count");
         JSONArray awardRows = getArray("/rest/v1/tvdesk_awards?active=eq.true&select=*&order=sort_order.asc");
+        JSONArray postRows = optionalArray("/rest/v1/tvdesk_posts?active=eq.true&removed_at=is.null&select=id,user_id,message,badge,bonus_stars,posted_on,expires_on&order=sort_order.asc");
+        JSONArray achievementRows = optionalArray("/rest/v1/tvdesk_user_achievements?active=eq.true&select=id,user_id,title,subtitle,icon&order=sort_order.asc");
 
         Board.Settings settings = settingsRows.length() == 0
                 ? new Board.Settings(null, "cards", null, null, null, "navy")
@@ -53,7 +61,15 @@ public final class DeskStore {
         List<Board.User> users = new ArrayList<Board.User>();
         for (int i = 0; i < userRows.length(); i++) {
             JSONObject row = userRows.getJSONObject(i);
-            users.add(new Board.User(row.getString("id"), row.optString("name", ""), row.optInt("sort_order", 0)));
+            users.add(new Board.User(
+                    row.getString("id"),
+                    row.optString("name", ""),
+                    row.optInt("sort_order", 0),
+                    row.optString("reward_title", "Movie night"),
+                    row.optInt("reward_target", 50),
+                    row.optInt("stars_toward_reward", 0),
+                    row.optInt("streak_current", 0),
+                    row.optInt("streak_best", 0)));
         }
 
         List<Board.Task> tasks = new ArrayList<Board.Task>();
@@ -82,7 +98,39 @@ public final class DeskStore {
             JSONObject row = logRows.getJSONObject(i);
             counts.put(row.getString("task_id"), row.optInt("count", 0));
         }
-        return new Board(settings, users, tasks, items, awards, counts);
+
+        List<Board.Post> posts = new ArrayList<Board.Post>();
+        for (int i = 0; i < postRows.length(); i++) {
+            JSONObject row = postRows.getJSONObject(i);
+            posts.add(new Board.Post(
+                    row.getString("id"),
+                    textOrNull(row, "user_id"),
+                    row.optString("message", ""),
+                    row.optString("badge", "none"),
+                    row.optInt("bonus_stars", 0),
+                    textOrNull(row, "posted_on"),
+                    textOrNull(row, "expires_on")));
+        }
+
+        List<Board.Achievement> achievements = new ArrayList<Board.Achievement>();
+        for (int i = 0; i < achievementRows.length(); i++) {
+            JSONObject row = achievementRows.getJSONObject(i);
+            achievements.add(new Board.Achievement(
+                    row.getString("id"),
+                    textOrNull(row, "user_id"),
+                    row.optString("title", ""),
+                    row.optString("subtitle", ""),
+                    row.optString("icon", "star")));
+        }
+        return new Board(settings, users, tasks, items, awards, counts, posts, achievements);
+    }
+
+    private JSONArray optionalArray(String path) {
+        try {
+            return getArray(path);
+        } catch (Exception ignored) {
+            return new JSONArray();
+        }
     }
 
     public void setDone(String taskId, String day, int count) throws Exception {
@@ -153,7 +201,8 @@ public final class DeskStore {
                 row.optString("city", ""),
                 row.optString("countdown_label", ""),
                 textOrNull(row, "countdown_date"),
-                meta.optString("look", "navy"));
+                meta.optString("look", "navy"),
+                meta.optString("tv_experience", "family"));
     }
 
     private Board.Task taskOf(JSONObject row) throws Exception {
